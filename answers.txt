@@ -1,0 +1,271 @@
+1-savol: Aiogramda Finite State Machine nima va u nima uchun kerak? FSM bo’lmaganda nima bo’lar edi?
+FSM nima o'zi nima?
+FSM (Finite State Machine) — bu chegaralangan holatlar mashinasi. Oddiy qilib aytganda, bot foydalanuvchi bilan suhbatlashganda uning qaysi bosqichda turganini “eslab qolish” usuli.
+Masalan, siz botda ro‘yxatdan o‘tish formasi yasayapsiz:
+Ismini so‘raysiz
+Yoshini so‘raysiz
+Telefon raqamini so‘raysiz
+Bot foydalanuvchi qaysi bosqichda turganini bilishi kerak. FSM aynan shuni nazorat qiladi.
+FSM nima uchun kerak?
+Agar FSM ishlatilsa:
+Bot har bir foydalanuvchi uchun alohida sessiya (holat) saqlaydi.
+Bir foydalanuvchi ism kiritayotgan bo‘lsa, boshqasi yosh kiritayotgan bo‘lishi mumkin – FSM ularning jarayonini chalkashtirib yubormaydi.
+Har bir bosqich aniq tartibda boshqariladi.
+Ya’ni FSM yordamida siz dialoglarni step-by-step boshqarasiz.
+FSM bo‘lmasa nima bo‘ladi?
+FSM bo‘lmagan holatda:
+Bot foydalanuvchining qaysi bosqichda turganini “eslab qolmaydi”.
+Siz har safar ma’lumotni o‘zingiz saqlash uchun qo‘shimcha kod yozishingiz kerak bo‘ladi (masalan, dictionary yoki database orqali).
+Har bir step’ni boshqarish qiyinlashadi va kod murakkablashadi.
+Xatoliklar ko‘payadi, ayniqsa bir vaqtning o‘zida ko‘p foydalanuvchi ishlatganda.
+qisqa qilib aytsak, FSM — foydalanuvchining holatini boshqaradigan mexanizm.
+Kerakligi: tartiblangan dialoglar, ko‘p foydalanuvchilarni bir vaqtda boshqarish, kodni soddalashtirish.
+FSMsiz ham bo‘lishi mumkin, lekin katta loyihalarda chalkashlik va xatoliklar ko‘payadi.
+
+
+2-savol: Aiogramda fayllar bilan ishlaganda ularni databasega qanday usulda saqlash kerak?
+Fayllarni Database ichida saqlash kerakmi degan savol paydo bo'lsa,  bunga javob ko'p holatda yo'q.
+Sabablari:
+-   Fayl (rasm, video, pdf va hokazo) hajmi katta bo‘ladi.
+-   Uni DB’da BLOB (Binary Large Object) sifatida saqlash mumkin, lekin
+    bu:
+    -   Ma’lumotlar bazasini tezda kattalashtiradi
+    -   Backup/restore vaqtini uzaytiradi
+    -   Tizim sekinlashadi
+👉 Shuning uchun tavsiya etilgan usul – faylning o‘zini diskda yoki
+bulutda saqlash, database’da esa faqat yo‘lini (path yoki URL) saqlash.
+
+2. Aiogram’da foydalanuvchi yuborgan faylni olish
+Aiogram’da fayl yuborilganda bizga file_id keladi. file_id orqali faylni
+Telegram serveridan yuklab olishimiz mumkin.
+
+Masalan:
+
+    @router.message(F.content_type == "document")
+    async def handle_file(message: Message, bot: Bot):
+        file_id = message.document.file_id
+        file = await bot.get_file(file_id)
+        file_path = file.file_path
+
+        # Faylni lokal diskka yuklash
+        destination = f"downloads/{message.document.file_name}"
+        await bot.download_file(file_path, destination)
+
+        # Endi DBga faqat path saqlaymiz
+        db.save_file_info(
+            user_id=message.from_user.id,
+            file_name=message.document.file_name,
+            file_path=destination
+        )
+
+        await message.answer("✅ Fayl saqlandi!")
+
+Database jadvali:
+
+    CREATE TABLE files (
+        id SERIAL PRIMARY KEY,
+        user_id BIGINT,
+        file_name TEXT,
+        file_path TEXT,
+        uploaded_at TIMESTAMP DEFAULT NOW()
+    );
+
+Fayllarni qayerda saqlash mumkin?
+
+Variantlar:
+
+1.  Diskda (local storage)
+    -   Oddiy va tez
+    -   Ammo serverni almashtirsangiz yoki scale qilsangiz muammo
+        chiqadi
+2.  Cloud storage (AWS S3, Google Cloud, Yandex Object Storage)
+    -   Faylni bulutga yuklaysiz
+    -   Database’da faqat URL saqlaysiz
+    -   Eng barqaror va keng qo‘llaniladigan usul
+3.  Database ichida (BLOB sifatida)
+    -   Juda katta fayllar uchun tavsiya etilmaydi
+    -   Faqat kichik fayllar (masalan, avatar rasm) uchun ishlatish
+        mumkin
+
+------------------------------------------------------------------------
+
+4. Tavsiya etilgan amaliyot
+
+-   Fayllarni disk yoki cloud’da saqlash
+-   DB’da esa faqat file_path yoki URL yozish
+-   file_id’ni ham saqlab qo‘yish foydali, kerak bo‘lsa Telegram’dan
+    qayta yuklab olish mumkin
+
+Misol jadval:
+
+    CREATE TABLE user_files (
+        id SERIAL PRIMARY KEY,
+        user_id BIGINT,
+        file_id TEXT,        -- Telegram file_id
+        file_name TEXT,
+        local_path TEXT,     -- agar diskda saqlansa
+        url TEXT,            -- agar cloud’da bo‘lsa
+        uploaded_at TIMESTAMP DEFAULT NOW()
+    );
+
+------------------------------------------------------------------------
+
+Xulosa
+
+-   Katta loyihalarda: fayllarni cloud storage’da saqlash eng yaxshi
+    yechim.
+-   Oddiy botlarda: fayllarni diskka yozib, yo‘lini DB’da saqlash
+    yetarli.
+-   Faylni to‘g‘ridan-to‘g‘ri DB ichida saqlash – kam hollarda
+    ishlatiladi.
+
+
+3-savol: Aiogramda dependency injection bormi? U qanday implement qilinadi va nima uchun kerak?
+Dependency Injection mavjudmi?
+Ha, Aiogram 3.x versiyasida built-in dependency injection tizimi mavjud. Bu framework'ning asosiy xususiyatlaridan biri.
+Qanday implement qilinadi?
+3 ta asosiy usul:
+
+Middleware orqali - Middleware'lar orqali handler'larga kerakli obyektlarni inject qilish
+Magic Filter/Type hints - Python type hints orqali avtomatik dependency resolution
+Dispatcher workflow data - Global data store orqali dependency'larni saqlash va tarqatish
+
+Qanday ishlaydi?
+Aiogram handler function'larning parametrlarini tahlil qiladi va kerakli dependency'larni avtomatik ravishda topib, inject qiladi. Bu Python'ning type annotation va inspection xususiyatlariga asoslanadi.
+Nima uchun kerak?
+Asosiy sabablari:
+
+Loose coupling - Kod qismlari orasidagi bog'liqlikni kamaytirish
+Testability - Mock obyektlar bilan testlash osonlashuvi
+Reusability - Bir xil service'larni turli handler'larda qayta ishlatish
+Configuration management - Turli muhitlarda turli implementation'larni ishlatish imkoniyati
+Resource sharing - Database connection pool, cache kabi resurslarni samarali bo'lishish
+Separation of concerns - Har bir komponent o'z mas'uliyatiga e'tibor qaratishi
+
+Praktik foydalar:
+
+Database connection - Har handler'da yangi connection ochish o'rniga bitta pool ishlatish
+External API clients - HTTP client'larni qayta ishlatish
+Cache systems - Redis, memcached kabi cache'larni inject qilish
+Logger systems - Centralized logging
+Business logic services - User service, payment service kabi
+
+DI pattern'i katta bot loyihalarda kod sifatini va maintainability'ni sezilarli darajada oshiradi.
+
+
+4-savol: Merchant va Subscribe API o’rtasida qanday farqlar bor?
+
+Merchant API (Payments API)
+Maqsadi: Telegram foydalanuvchilariga tovarlar va xizmatlar taklif qiluvchi botlar yaratish uchun.
+Xususiyatlari:
+
+To'lov turi: Telegram to'lovlarni o'zi qayta ishlamaydi, balki developerlarga turli uchinchi tomon to'lov provayderlar bilan bevosita integratsiya qilish imkonini beradi.
+Mahsulot turlari: Fizik va raqamli mahsulotlar uchun
+To'lov modeli: Bir martalik to'lovlar (one-time payments)
+Valyuta: Raqamli tovarlar va xizmatlar uchun to'lovlar faqat Telegram Stars orqali amalga oshirilishi kerak.
+Integration: Stripe, PayPal kabi tashqi to'lov tizimlar bilan ishlaydi
+
+Subscribe API (Star Subscriptions)
+Maqsadi: Botlar va kanallar obuna yaratishi mumkin, foydalanuvchilardan kontent va xizmatlar evaziga muntazam ravishda ma'lum miqdorda Telegram Stars olish Star subscriptions
+Xususiyatlari:
+
+To'lov turi: Faqat Telegram Stars
+To'lov modeli: Davriy/takroriy to'lovlar (recurring payments)
+Maqsad: Premium kontent, membership access
+Boshqaruv: Telegram ichidagi tizim orqali
+Conversion: Developlar botlari orqali topgan yulduzlarni Fragment orqali Toncoin'larga aylantirishi mumkin.
+
+To'lov modeli:
+
+Merchant: Bir martalik to'lovlar
+Subscribe: Takroriy/davriy to'lovlar
+
+
+Valyuta:
+
+Merchant: Har xil valyutalar (provayderga bog'liq)
+Subscribe: Faqat Telegram Stars
+
+
+Integratsiya:
+
+Merchant: Tashqi to'lov tizimlar kerak
+Subscribe: Telegram ichki tizimi
+
+
+Maqsad:
+
+Merchant: Tovar/xizmat sotish
+Subscribe: Premium membership/kontent
+
+
+Murakkablik:
+
+Merchant: Murakkab integratsiya kerak
+Subscribe: Sodda, Telegram native
+Subscribe botlar Payments API chegaralaridan tashqariga chiqib, foydalanuvchilarga mijozlaridan takroriy to'lovlar olish imkonini beradi.
+
+
+5-savol: Biz merchant service sifatida nima uchun CallbackAPI tashkil qilishimiz kerak? Undan bizga nima foyda?
+
+Nima uchun CallbackAPI kerak?
+1. Haqiqiy vaqtda to'lov statusini bilish
+
+To'lov muvaffaqiyatli bo'lganda darhol xabardor bo'lasiz
+To'lov rad etilsa yoki xatolik bo'lsa tezda ma'lum bo'ladi
+Foydalanuvchiga darhol javob berish imkoniyati
+
+2. Xavfsizlik va ishonchlilik
+
+To'lov ma'lumotlari bevosita to'lov provayderidan keladi
+3-chi tomon orqali manipulatsiya imkoniyati yo'q
+Authentic va verified ma'lumotlar
+
+3. Avtomatlashtirish
+
+Manual tekshiruv kerak emas
+To'lov tasdiqlangandan so'ng avtomatik xizmat yoqiladi
+Order statuslari avtomatik yangilanadi
+
+Qanday foydalar beradi?
+Biznes logikasi uchun:
+
+Order fulfillment - To'lov tasdiqlangandan keyin mahsulotni avtomatik yetkazish
+Inventory management - Stock'ni avtomatik yangilash
+Customer notification - Mijozga avtomatik confirmation yuborish
+
+Foydalanuvchi tajribasi:
+
+Tezlik - Darhol xizmat faollashadi
+Ishonch - To'lov holati aniq ma'lum
+Qulaylik - Kutishga hojat yo'q
+
+Texnik jihatlar:
+
+Monitoring - Barcha tranzaksiyalarni kuzatish
+Logging - To'lov tarixini avtomatik saqlash
+Error handling - Xatoliklarni tezda aniqlash va hal qilish
+
+Callback kelmaydigan holatlarda nima bo'ladi?
+
+Manual checking kerak bo'ladi
+Delayed service - Xizmat kechikadi
+Customer support muammolari ko'payadi
+Revenue loss - Ba'zi to'lovlar o'tkazib yuborilishi mumkin
+
+Praktik misol:
+CallbackAPI bo'lmasa:
+
+Foydalanuvchi to'lov qiladi
+Siz 5-10 daqiqa kutasiz
+Manual ravishda to'lov statusini tekshirasiz
+Keyin xizmatni faollashtirасiz
+
+CallbackAPI bilan:
+
+Foydalanuvchi to'lov qiladi
+1-2 soniya ichida callback keladi
+Avtomatik xizmat faollashadi
+Mijoz darhol xizmatdan foydalana boshlaydi
+
+Xulosa: CallbackAPI merchant service'ning muhim qismi bo'lib, biznesni avtomatlashtirish, xavfsizlik va yaxshi foydalanuvchi tajribasi uchun zarur.

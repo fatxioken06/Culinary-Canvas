@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culinary Canvas</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <header>
+        <h1>Culinary Canvas</h1>
+        <nav>
+            <ul>
+                <li><a href="#">Home</a></li>
+                <li><a href="#">Recipes</a></li>
+                <li><a href="#">Categories</a></li>
+                <li><a href="#">About</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h2>Discover, Share, and Rate Delicious Recipes!</h2>
+            <p>Join our community of chefs and food lovers.</p>
+            <a class="btn" href="#">Get Started</a>
+        </section>
+
+        <section class="features">
+            <h3>Why Culinary Canvas?</h3>
+            <div class="grid">
+                <div class="card">
+                    <h4>Create</h4>
+                    <p>Write down your favorite recipes and keep them safe.</p>
+                </div>
+                <div class="card">
+                    <h4>Share</h4>
+                    <p>Show your recipes to friends and the whole world.</p>
+                </div>
+                <div class="card">
+                    <h4>Discover</h4>
+                    <p>Explore recipes from different cultures and cuisines.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Culinary Canvas. All rights reserved.</p>
+    </footer>
+</body>
+</html>
